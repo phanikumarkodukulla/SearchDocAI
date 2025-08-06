@@ -145,7 +145,7 @@ const SearchPage = () => {
               </p>
             </div>
             
-            {/* Search Interface */}
+            {/* Enhanced Search Interface */}
             <div className="max-w-2xl mx-auto mb-12">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -158,12 +158,13 @@ const SearchPage = () => {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  disabled={isSearching}
                 />
                 <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
                   <Button 
                     onClick={handleSearch}
-                    disabled={isSearching}
-                    className="bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-700 hover:to-cyan-700 px-8 py-3 rounded-xl font-medium shadow-md transition-all duration-200 transform hover:scale-105"
+                    disabled={isSearching || !query.trim()}
+                    className="bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-700 hover:to-cyan-700 px-8 py-3 rounded-xl font-medium shadow-md transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
                   >
                     {isSearching ? (
                       <div className="flex items-center gap-2">
@@ -182,9 +183,14 @@ const SearchPage = () => {
               
               {isSearching && (
                 <div className="mt-6">
-                  <Progress value={searchProgress} className="h-2 bg-slate-200" />
-                  <div className="mt-2 text-sm text-slate-600">
-                    Searching across multiple engines...
+                  <Progress value={searchProgress} className="h-3 bg-slate-200" />
+                  <div className="mt-3 flex justify-between items-center text-sm">
+                    <span className="text-slate-600">
+                      Searching across multiple engines and sources...
+                    </span>
+                    <span className="text-indigo-600 font-medium">
+                      {Math.round(searchProgress)}%
+                    </span>
                   </div>
                 </div>
               )}
