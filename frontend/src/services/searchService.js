@@ -109,12 +109,12 @@ class SearchService {
     const allResults = [];
     const searchPromises = [];
     let completedSearches = 0;
-    const totalSearches = 2;
+    const totalSearches = 3; // Increased to 3 with additional search
 
     // Progress callback
     const updateProgress = (message) => {
       completedSearches++;
-      const progress = (completedSearches / totalSearches) * 80; // 80% for search, 20% for processing
+      const progress = Math.min((completedSearches / totalSearches) * 80, 80); // 80% for search, 20% for processing
       if (onProgress) onProgress(progress, message);
     };
 
@@ -144,25 +144,82 @@ class SearchService {
         return [];
       });
 
-    searchPromises.push(duckDuckGoPromise, wikipediaPromise);
+    // Additional search: Open Library (for book-related topics)
+    const openLibraryPromise = this.searchOpenLibrary(query)
+      .then(results => {
+        allResults.push(...results);
+        updateProgress('Searched additional sources');
+        return results;
+      })
+      .catch(error => {
+        console.error('Additional search failed:', error);
+        updateProgress('Additional search completed');
+        return [];
+      });
+
+    searchPromises.push(duckDuckGoPromise, wikipediaPromise, openLibraryPromise);
 
     // Wait for all searches to complete
     await Promise.allSettled(searchPromises);
 
     // Add some mock results if we don't get enough real results
-    if (allResults.length < 3) {
-      const mockResults = this.generateMockResults(query, 5 - allResults.length);
+    if (allResults.length < 5) {
+      const mockResults = this.generateMockResults(query, 8 - allResults.length);
       allResults.push(...mockResults);
     }
 
     if (onProgress) onProgress(90, 'Processing results');
 
+    // Remove duplicates and limit results
+    const uniqueResults = this.removeDuplicates(allResults);
+
     return {
       query: query,
-      totalResults: Math.floor(Math.random() * 100000) + 10000,
+      totalResults: Math.floor(Math.random() * 200000) + 50000,
       searchTime: (Math.random() * 1.5 + 0.3).toFixed(2),
-      results: allResults.slice(0, 8) // Limit to 8 results
+      results: uniqueResults.slice(0, 8) // Limit to 8 results
     };
+  }
+
+  async searchOpenLibrary(query) {
+    try {
+      // Open Library Search API for books and educational content
+      const searchUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=3&fields=title,author_name,first_publish_year,subject,key`;
+      const response = await fetch(searchUrl);
+      const data = await response.json();
+      
+      const results = [];
+      
+      if (data.docs && data.docs.length > 0) {
+        data.docs.forEach(book => {
+          if (book.title) {
+            results.push({
+              title: `${book.title}${book.author_name ? ' by ' + book.author_name[0] : ''}`,
+              url: `https://openlibrary.org${book.key}`,
+              snippet: `Published ${book.first_publish_year || 'N/A'}.${book.subject ? ' Subjects: ' + book.subject.slice(0, 3).join(', ') : ''} A comprehensive resource about ${query} available through Open Library.`,
+              source: 'Open Library'
+            });
+          }
+        });
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('Open Library search error:', error);
+      return [];
+    }
+  }
+
+  removeDuplicates(results) {
+    const seen = new Set();
+    return results.filter(result => {
+      const key = result.title.toLowerCase().trim();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 
   generateMockResults(query, count) {
