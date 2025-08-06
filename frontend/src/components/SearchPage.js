@@ -8,7 +8,9 @@ import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Progress } from './ui/progress';
 import { toast } from '../hooks/use-toast';
-import mockSearchData from '../data/mock';
+import SearchService from '../services/searchService';
+import DocumentationService from '../services/documentationService';
+import PDFService from '../services/pdfService';
 
 const SearchPage = () => {
   const [query, setQuery] = useState('');
