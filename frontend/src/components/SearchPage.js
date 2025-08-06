@@ -20,6 +20,11 @@ const SearchPage = () => {
   const [documentationData, setDocumentationData] = useState(null);
   const resultsRef = useRef(null);
 
+  // Initialize services
+  const searchService = new SearchService();
+  const documentationService = new DocumentationService();
+  const pdfService = new PDFService();
+
   const handleSearch = async () => {
     if (!query.trim()) {
       toast({
@@ -32,65 +37,91 @@ const SearchPage = () => {
     setIsSearching(true);
     setSearchProgress(0);
     
-    // Simulate search progress
-    const progressSteps = [
-      { step: 20, message: "Searching Google..." },
-      { step: 40, message: "Searching Bing..." },
-      { step: 60, message: "Searching DuckDuckGo..." },
-      { step: 80, message: "Analyzing results..." },
-      { step: 100, message: "Generating documentation..." }
-    ];
+    try {
+      // Progress callback
+      const onProgress = (progress, message) => {
+        setSearchProgress(progress);
+        toast({
+          title: message,
+          duration: 1500
+        });
+      };
 
-    for (const { step, message } of progressSteps) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setSearchProgress(step);
+      // Perform real search across multiple engines
+      const results = await searchService.searchMultipleSources(query, onProgress);
+      
+      // Generate documentation from search results
+      onProgress(95, 'Generating documentation...');
+      const docs = documentationService.generateDocumentation(query, results.results);
+      
+      setSearchResults(results);
+      setDocumentationData(docs);
+      setIsSearching(false);
+      setSearchProgress(100);
+      
+      // Scroll to results
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+
       toast({
-        title: message,
-        duration: 1000
+        title: "Search completed successfully!",
+        description: `Found ${results.totalResults.toLocaleString()} results across multiple search engines`
+      });
+      
+    } catch (error) {
+      console.error('Search error:', error);
+      setIsSearching(false);
+      toast({
+        title: "Search failed",
+        description: "Please try again with a different query",
+        variant: "destructive"
       });
     }
-
-    // Use mock data
-    const mockResults = mockSearchData.searchResults(query);
-    const mockDocs = mockSearchData.generateDocumentation(query);
-    
-    setSearchResults(mockResults);
-    setDocumentationData(mockDocs);
-    setIsSearching(false);
-    
-    // Scroll to results
-    setTimeout(() => {
-      resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-
-    toast({
-      title: "Search completed successfully!",
-      description: `Found ${mockResults.totalResults} results across multiple search engines`
-    });
   };
 
-  const handleDownloadPDF = () => {
-    if (!documentationData) return;
+  const handleDownloadPDF = async () => {
+    if (!documentationData || !searchResults) {
+      toast({
+        title: "No data to export",
+        description: "Please perform a search first",
+        variant: "destructive"
+      });
+      return;
+    }
     
     toast({
-      title: "PDF Download Started",
+      title: "Generating PDF...",
       description: "Your documentation is being prepared..."
     });
     
-    // Mock PDF generation
-    setTimeout(() => {
+    try {
+      // Generate PDF using the real PDF service
+      const pdfDoc = await pdfService.generatePDF(documentationData, searchResults.results);
+      const filename = `${query.replace(/\s+/g, '_')}_documentation.pdf`;
+      
+      await pdfService.downloadPDF(pdfDoc, filename);
+      
+      toast({
+        title: "Download Complete!",
+        description: "Your documentation has been downloaded as PDF"
+      });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      
+      // Fallback to text download if PDF fails
+      const textContent = `${documentationData.title}\n\n${documentationData.quickGuide}\n\n${documentationData.detailedDocumentation}`;
       const element = document.createElement('a');
-      element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(
-        `${documentationData.title}\n\n${documentationData.quickGuide}\n\n${documentationData.detailedDocumentation}`
-      );
+      element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(textContent);
       element.download = `${query.replace(/\s+/g, '_')}_documentation.txt`;
       element.click();
       
       toast({
-        title: "Download Complete!",
-        description: "Your documentation has been downloaded"
+        title: "PDF generation failed",
+        description: "Downloaded as text file instead",
+        variant: "destructive"
       });
-    }, 2000);
+    }
   };
 
   return (
