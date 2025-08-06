@@ -23,8 +23,21 @@ class SearchService {
 
   async searchDuckDuckGo(query) {
     try {
-      // DuckDuckGo Instant Answer API
-      const response = await this.jsonp(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+      // Use a more reliable CORS proxy approach
+      const searchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+      
+      // Try direct JSONP first
+      let response;
+      try {
+        response = await this.jsonp(searchUrl);
+      } catch (jsonpError) {
+        console.log('JSONP failed, trying CORS proxy:', jsonpError);
+        // Fallback to CORS proxy
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(searchUrl)}`;
+        const proxyResponse = await fetch(proxyUrl);
+        const proxyData = await proxyResponse.json();
+        response = JSON.parse(proxyData.contents);
+      }
       
       const results = [];
       
@@ -32,8 +45,18 @@ class SearchService {
       if (response.Abstract) {
         results.push({
           title: response.Heading || `${query} - Overview`,
-          url: response.AbstractURL || '#',
+          url: response.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
           snippet: response.Abstract,
+          source: 'DuckDuckGo'
+        });
+      }
+      
+      // Process definition if available
+      if (response.Definition && response.DefinitionURL) {
+        results.push({
+          title: `${query} - Definition`,
+          url: response.DefinitionURL,
+          snippet: response.Definition,
           source: 'DuckDuckGo'
         });
       }
